@@ -1,0 +1,103 @@
+#cloud-config
+# vim: syntax=yaml
+
+# Add some user groups. Generally, I like to add one for my own user, but you can add as many as you want here.
+groups:
+  - myuser
+
+# Add users, don't forget to add your own user. For specific applications, like BackupPC, I like to add the user with the private key.
+# This way, my backup system can start backuping up as soon as I add it in BackupPC.
+users:
+  - name: myuser # This is the name of your user.
+    gecos: My User # The Real Name of your user.
+    primary_group: myuser # The primary group of this user is the group I created above.
+    sudo: ['ALL=(ALL) NOPASSWD:ALL'] # Since we aren't setting a password, this user shouldn't enter a password for sudo commands.
+    groups: [ sudo ] # Add user to the sudo user group.
+    shell: /usr/bin/fish # I like to use the Fish-shell. If you like the regular bash, change this to /bin/bash
+    ssh-authorized-keys:
+      - <ssh key> # Add the ssh key of the user here.
+  - name: backuppc # I use BackupPC as a backup solution. I add a special user for it. Since everything is explained above, I'm not going to explain it here.
+    gecos: BackupPC User 
+    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+    groups: [ sudo ]
+    shell: /bin/bash
+    ssh-authorized-keys:
+      - ssh-rsa <ssh key>
+      
+# This is going to create some files on the server - it will add my personal message of the day header, amongst things.  
+# Don't forget to change the ascii ke.vinpet.it to something else. 
+write_files:
+  - path: /etc/update-motd.d/00-welcome
+    content: |
+      #!/bin/sh
+      printf "
+                 _              _                  _     _ _
+                | |            (_)                | |   (_) |
+                | | _______   ___ _ __  _ __   ___| |_   _| |_
+                | |/ / _ \ \ / / | '_ \| '_ \ / _ \ __| | | __|
+                |   <  __/\ V /| | | | | |_) |  __/ |_ _| | |_
+                |_|\_\___(_)_/ |_|_| |_| .__/ \___|\__(_)_|\__|
+                                       | |
+                                       |_|
+
+      "
+      [ -r /etc/lsb-release ] && . /etc/lsb-release
+
+      if [ -z "$DISTRIB_DESCRIPTION" ] && [ -x /usr/bin/lsb_release ]; then
+              # Fall back to using the very slow lsb_release utility
+              DISTRIB_DESCRIPTION=$(lsb_release -s -d)
+      fi
+
+      printf "  Welcome to %s (%s %s %s)\n" "$DISTRIB_DESCRIPTION" "$(uname -o)" "$(uname -r)" "$(uname -m)"
+  - path: /etc/update-motd.d/60-informations
+    content: |
+      #!/bin/sh
+
+      upSeconds="$(/usr/bin/cut -d. -f1 /proc/uptime)"
+      secs=$((${upSeconds}%60))
+      mins=$((${upSeconds}/60%60))
+      hours=$((${upSeconds}/3600%24))
+      days=$((${upSeconds}/86400))
+      UPTIME=`printf "%d days, %02dh %02dm %02ds" "$days" "$hours" "$mins" "$secs"`
+      stamp="/var/lib/update-notifier/updates-available"
+
+      # get the load averages
+      read one five fifteen rest < /proc/loadavg
+
+      echo "$(tput setaf 2)
+        Hostname...........: `hostname`
+        Uptime.............: ${UPTIME}
+        IP Addresses.......: `ip a | grep glo | awk '{print $2}' | head -1 | cut -f1 -d/` and `wget -q -O - http://icanhazip.com/ | tail`
+
+        Updates:  `[ ! -r "$stamp" ] || cat "$stamp"`
+
+        =====================================================================
+                    Problems or questions? Mail to <email>
+        =====================================================================
+
+       $(tput sgr0)"
+
+# At this point, the main operations are finished.
+final_message: "System has been provisioned, it took us $UPTIME seconds"
+
+# Install applications - in this example, we are only going to install the Fish shell.
+apt_update: true
+package_update: true
+packages:
+  - fish
+  
+# Disallow ROOT login, add in the users that are allowed to login. Don't forget to change this!
+runcmd:
+  - sed -i -e '/^PermitRootLogin/s/^.*$/PermitRootLogin no/' /etc/ssh/sshd_config
+  - sed -i -e '$aAllowUsers <LIST USERS THAT CAN LOGIN>' /etc/ssh/sshd_config
+  - restart ssh
+  - rm -f /etc/update-motd.d/10-help-text
+  - rm -f /etc/update-motd.d/00-header
+  - rm -f /etc/update-motd.d/50-motd-news
+  - rm -f /etc/update-motd.d/80-esm
+  - rm -f /etc/update-motd.d/80-livepatch
+  - chmod u+x /etc/update-motd.d/00-welcome
+  - chmod u+x /etc/update-motd.d/60-informations
+  - fish
+  
+  # That's all folks!
