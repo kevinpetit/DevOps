@@ -63,7 +63,7 @@ read -p "Is this a static website (non-PHP)? [y/n] " STATIC_SITE
 if [ $STATIC_SITE == "n" ]; then
     # Time to generate our PHP-FPM pool configuration.
     PHP_POOL_CONFIG='/etc/php/'$PHP_VERSION'/fpm/pool.d/'$DOMAIN'.pool.conf'
-    cp ../templates/php_pool.conf $PHP_POOL_CONFIG
+    cp templates/php_pool.conf $PHP_POOL_CONFIG
     read -p "What is the minimum amount of PHP-FPM servers for this site? Should be at least 1:" FPM_MIN_SERVERS
     read -p "What is the maximum amount of PHP-FPM servers for this site? Should be at least 1:" FPM_MAX_SERVERS
     read -p "What is the default amount of PHP-FPM servers for this site? Should be at least 1:" FPM_DEF_SERVERS
